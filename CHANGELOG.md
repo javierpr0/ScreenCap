@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2025-01-31
+
+### Fixed
+- Fixed notification crash by adding permission checks before sending notifications
+- Prevented UNErrorDomain crashes when notification permissions are not granted
+- Added safe notification handling with fallback to console logging
+
 ## [1.0.2] - 2025-01-31
 
 ### Fixed

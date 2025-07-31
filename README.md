@@ -25,12 +25,31 @@
 
 ## 🚀 Installation
 
-### Requirements
+### Option 1: Download Pre-built Application (Recommended)
+
+**For users who just want to use ScreenCap without building from source:**
+
+1. **Go to [Releases](https://github.com/javierpr0/ScreenCap/releases)**
+2. **Download the latest version:**
+   - `ScreenCap.dmg` (recommended) - Double-click to open, then drag to Applications
+   - `ScreenCap.zip` - Extract and move to Applications folder
+
+3. **First run setup:**
+   - Right-click ScreenCap.app and select "Open" (required for unsigned apps)
+   - Grant screen recording permissions when prompted
+   - Go to `System Settings > Privacy & Security > Screen Recording`
+   - Enable ScreenCap in the list
+
+### Option 2: Building from Source
+
+**For developers or users who want to build from source:**
+
+#### Requirements
 - macOS 14.0 or later
 - Xcode Command Line Tools
 - Swift 5.9+
 
-### Building from Source
+#### Building from Source
 
 1. **Clone the repository**
    ```bash
@@ -53,7 +72,7 @@
    make run
    ```
 
-### Available Commands
+#### Available Commands
 
 - `make build` - Build the application
 - `make clean` - Clean build artifacts
@@ -64,6 +83,18 @@
 - `make dist` - Create DMG for distribution
 - `make zip` - Create ZIP for distribution
 - `make help` - Show help
+
+#### Creating Releases (for maintainers)
+
+```bash
+# Create a new release
+./create-release.sh 1.1.0
+
+# This will:
+# 1. Create and push a git tag
+# 2. Trigger GitHub Actions to build and release
+# 3. Generate DMG and ZIP files automatically
+```
 
 ## 📖 Usage
 

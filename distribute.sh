@@ -3,7 +3,10 @@
 # Distribution script for ScreenCap
 # This script creates a completely standalone version of the application
 
-echo "🚀 Starting distribution process for ScreenCap..."
+# Get version from git tag or use default
+VERSION=${1:-$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "1.0.0")}
+
+echo "🚀 Starting distribution process for ScreenCap v$VERSION..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -25,9 +28,9 @@ make clean
 echo "🔨 Compiling application in release mode..."
 swift build -c release -Xswiftc -O
 
-# Create the application bundle
+# Create the application bundle with version
 echo "📦 Creating application bundle..."
-make build
+VERSION=$VERSION make build
 
 # Verify the application compiled correctly
 if [ ! -d ".build/ScreenCap.app" ]; then
@@ -135,6 +138,7 @@ echo "  - dist/ScreenCap.zip ($(du -h dist/ScreenCap.zip | cut -f1))"
 echo "  - dist/INSTALLATION_INSTRUCTIONS.txt"
 echo ""
 echo -e "${YELLOW}📋 Build information:${NC}"
+echo "  - Version: $VERSION"
 echo "  - Architecture: $(uname -m)"
 echo "  - Minimum macOS version: 14.0"
 echo "  - Swift version: $(swift --version | head -n 1)"

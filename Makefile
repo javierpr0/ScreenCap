@@ -2,6 +2,7 @@
 
 APP_NAME = ScreenCap
 BUNDLE_ID = com.screencap.ScreenCap
+VERSION ?= 1.0.0
 BUILD_DIR = .build
 APP_DIR = $(BUILD_DIR)/$(APP_NAME).app
 CONTENTS_DIR = $(APP_DIR)/Contents
@@ -36,9 +37,9 @@ build:
 	@echo '	<key>CFBundleName</key>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<string>$(APP_NAME)</string>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<key>CFBundleVersion</key>' >> $(CONTENTS_DIR)/Info.plist
-	@echo '	<string>1.0</string>' >> $(CONTENTS_DIR)/Info.plist
+	@echo '	<string>$(VERSION)</string>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<key>CFBundleShortVersionString</key>' >> $(CONTENTS_DIR)/Info.plist
-	@echo '	<string>1.0</string>' >> $(CONTENTS_DIR)/Info.plist
+	@echo '	<string>$(VERSION)</string>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<key>CFBundleIconFile</key>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<string>ScreenCap</string>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<key>CFBundlePackageType</key>' >> $(CONTENTS_DIR)/Info.plist

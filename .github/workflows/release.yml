@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+        
+    - name: Extract version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+        
+    - name: Update version in Makefile
+      run: |
+        VERSION=${{ steps.version.outputs.version }}
+        sed -i '' "s/string>1\.0</string>$VERSION</g" Makefile
+        
+    - name: Build application
+      run: |
+        make clean
+        make build
+        
+    - name: Create distribution files
+      run: |
+        make dist
+        make zip
+        
+    - name: Verify build artifacts
+      run: |
+        ls -la dist/
+        file dist/ScreenCap.dmg
+        file dist/ScreenCap.zip
+        
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        VERSION=${{ steps.version.outputs.version }}
+        
+        # Extract changelog for this version
+        if grep -q "## \[$VERSION\]" CHANGELOG.md; then
+          # Extract content between this version and the next version marker
+          NOTES=$(awk "/## \[$VERSION\]/,/## \[/ {if (/## \[/ && !/## \[$VERSION\]/) exit; if (!/## \[$VERSION\]/) print}" CHANGELOG.md | sed '/^$/d')
+        else
+          NOTES="Release $VERSION
+          
+          This release includes the latest improvements and bug fixes.
+          
+          ## Installation
+          
+          ### Option 1: DMG (Recommended)
+          1. Download \`ScreenCap.dmg\`
+          2. Open the DMG file
+          3. Drag ScreenCap.app to Applications folder
+          
+          ### Option 2: ZIP
+          1. Download \`ScreenCap.zip\`
+          2. Extract the ZIP file
+          3. Move ScreenCap.app to Applications folder
+          
+          ## First Run
+          
+          ⚠️ **Important**: On first run, you'll need to:
+          1. Right-click ScreenCap.app and select 'Open'
+          2. Grant screen recording permissions in System Settings
+          
+          ## What's New
+          
+          Check the [CHANGELOG.md](https://github.com/javierpr0/ScreenCap/blob/main/CHANGELOG.md) for detailed changes."
+        fi
+        
+        # Save to file for GitHub release
+        echo "$NOTES" > release_notes.md
+        echo "Generated release notes for version $VERSION"
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: ScreenCap v${{ steps.version.outputs.version }}
+        body_path: release_notes.md
+        files: |
+          dist/ScreenCap.dmg
+          dist/ScreenCap.zip
+          dist/INSTALLATION_INSTRUCTIONS.txt
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: screencap-${{ steps.version.outputs.version }}
+        path: |
+          dist/ScreenCap.dmg
+          dist/ScreenCap.zip
+          dist/INSTALLATION_INSTRUCTIONS.txt
+        retention-days: 30

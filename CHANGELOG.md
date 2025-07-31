@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2025-01-31
+
+### Fixed
+- Fixed KeyboardShortcuts bundle loading error by including dependency bundles in app build
+- Added notification permissions declarations to Info.plist
+- Resolved EXC_BREAKPOINT crashes related to missing KeyboardShortcuts resources
+- Fixed UNErrorDomain errors when notification permissions are not properly declared
+
 ## [1.0.3] - 2025-01-31
 
 ### Fixed

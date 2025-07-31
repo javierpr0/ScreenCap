@@ -4,6 +4,7 @@ import CoreGraphics
 import UserNotifications
 import AVFoundation
 import Sentry
+import ScreenCaptureKit
 
 class ScreenshotManager: ObservableObject {
     private let userDefaults = UserDefaults.standard
@@ -49,23 +50,32 @@ class ScreenshotManager: ObservableObject {
     // MARK: - Permission Checking
     
     private func checkScreenRecordingPermission() -> Bool {
-        if #available(macOS 10.15, *) {
-            // On macOS 10.15+, check screen recording permissions
-            let runningApplication = NSRunningApplication.current
-            _ = runningApplication.processIdentifier
-            
-            // Try to create a screen image to verify permissions
-            let image = CGWindowListCreateImage(
-                CGRect(x: 0, y: 0, width: 1, height: 1),
-                .optionOnScreenOnly,
-                kCGNullWindowID,
-                .bestResolution
-            )
-            
-            return image != nil
-        }
-        return true // Earlier versions don't require special permissions
+        // Since our target is macOS 14.0+, we can use ScreenCaptureKit directly
+        return checkScreenCaptureKitPermission()
     }
+    
+    @available(macOS 14.0, *)
+    private func checkScreenCaptureKitPermission() -> Bool {
+        // Use ScreenCaptureKit to check if we can access screen content
+        let semaphore = DispatchSemaphore(value: 0)
+        var hasPermission = false
+        
+        Task {
+            do {
+                // Try to get shareable content - this requires screen recording permission
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                hasPermission = !content.displays.isEmpty
+            } catch {
+                hasPermission = false
+            }
+            semaphore.signal()
+        }
+        
+        // Wait for async operation with timeout
+        _ = semaphore.wait(timeout: .now() + 3.0)
+        return hasPermission
+    }
+    
     
     private func showPermissionAlert() {
         DispatchQueue.main.async {
@@ -180,13 +190,54 @@ class ScreenshotManager: ObservableObject {
     }
     
     private func captureRect(_ rect: NSRect, description: String) {
-        guard let cgImage = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, .bestResolution) else {
-            showError("Could not capture the image")
-            return
+        // Since our target is macOS 14.0+, we can use ScreenCaptureKit directly
+        captureRectWithScreenCaptureKit(rect, description: description)
+    }
+    
+    @available(macOS 14.0, *)
+    private func captureRectWithScreenCaptureKit(_ rect: NSRect, description: String) {
+        Task {
+            do {
+                // Get available displays
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                
+                guard let display = content.displays.first else {
+                    await MainActor.run {
+                        self.showError("No display found")
+                    }
+                    return
+                }
+                
+                // Create content filter for the display
+                let filter = SCContentFilter(display: display, excludingWindows: [])
+                
+                // Configure screenshot parameters
+                let configuration = SCStreamConfiguration()
+                configuration.width = Int(rect.width)
+                configuration.height = Int(rect.height)
+                configuration.sourceRect = rect
+                configuration.showsCursor = true
+                configuration.scalesToFit = false
+                
+                // Capture the screenshot
+                let cgImage = try await SCScreenshotManager.captureImage(
+                    contentFilter: filter,
+                    configuration: configuration
+                )
+                
+                // Convert to NSImage and save on main thread
+                await MainActor.run {
+                    let nsImage = NSImage(cgImage: cgImage, size: rect.size)
+                    self.saveImage(nsImage, description: description)
+                }
+                
+            } catch {
+                await MainActor.run {
+                    self.showError("ScreenCaptureKit error: \(error.localizedDescription)")
+                    SentrySDK.capture(error: error)
+                }
+            }
         }
-        
-        let nsImage = NSImage(cgImage: cgImage, size: rect.size)
-        saveImage(nsImage, description: description)
     }
     
     private func processTemporaryScreenshot(description: String) {

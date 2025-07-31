@@ -1,0 +1,76 @@
+
+# Build artifacts
+.build/
+dist/
+*.app
+*.dSYM.zip
+*.dSYM
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.swiftpm/
+Packages/
+Package.resolved
+*.swiftpm
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Development
+.reviews/
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Archives
+*.zip
+*.tar.gz
+*.dmg
+
+# Certificates and keys (security)
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+
+# Temporary files
+Thumbs.db
+ehthumbs.db

@@ -25,6 +25,12 @@ build:
 	@echo "🎨 Generating and copying application icon..."
 	@if [ ! -f ScreenCap.icns ]; then ./generate-iconset.sh; fi
 	@cp ScreenCap.icns $(RESOURCES_DIR)/
+	@echo "📦 Copying dependency bundles..."
+	@if [ -d .build/arm64-apple-macosx/release/KeyboardShortcuts_KeyboardShortcuts.bundle ]; then \
+		rm -rf $(RESOURCES_DIR)/KeyboardShortcuts_KeyboardShortcuts.bundle; \
+		cp -R .build/arm64-apple-macosx/release/KeyboardShortcuts_KeyboardShortcuts.bundle $(RESOURCES_DIR)/; \
+		chmod -R 755 $(RESOURCES_DIR)/KeyboardShortcuts_KeyboardShortcuts.bundle; \
+	fi
 	@echo "📝 Creating Info.plist..."
 	@echo '<?xml version="1.0" encoding="UTF-8"?>' > $(CONTENTS_DIR)/Info.plist
 	@echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $(CONTENTS_DIR)/Info.plist
@@ -56,6 +62,10 @@ build:
 	@echo '	<string>ScreenCap needs access to take screenshots.</string>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<key>NSScreenCaptureDescription</key>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<string>ScreenCap needs access to take screenshots.</string>' >> $(CONTENTS_DIR)/Info.plist
+	@echo '	<key>NSUserNotificationsUsageDescription</key>' >> $(CONTENTS_DIR)/Info.plist
+	@echo '	<string>ScreenCap sends notifications to inform you about screenshot operations.</string>' >> $(CONTENTS_DIR)/Info.plist
+	@echo '	<key>NSUserNotificationAlertStyle</key>' >> $(CONTENTS_DIR)/Info.plist
+	@echo '	<string>alert</string>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '</dict>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '</plist>' >> $(CONTENTS_DIR)/Info.plist
 	@echo "🔐 Signing the application..."

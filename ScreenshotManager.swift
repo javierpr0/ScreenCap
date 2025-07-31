@@ -118,6 +118,16 @@ class ScreenshotManager: ObservableObject {
             if let error = error {
                 print("Error requesting notification permission: \(error)")
                 SentrySDK.capture(error: error)
+            } else {
+                print("Notification permission granted: \(granted)")
+            }
+        }
+    }
+    
+    private func checkNotificationPermission(completion: @escaping (Bool) -> Void) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                completion(settings.authorizationStatus == .authorized)
             }
         }
     }
@@ -329,31 +339,43 @@ class ScreenshotManager: ObservableObject {
     // MARK: - Notifications
     
     private func showSuccess(_ message: String) {
-        let content = UNMutableNotificationContent()
-        content.title = "ScreenCap"
-        content.body = message
-        content.sound = .default
-        
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("Error showing success notification: \(error)")
-                SentrySDK.capture(error: error)
+        checkNotificationPermission { hasPermission in
+            if hasPermission {
+                let content = UNMutableNotificationContent()
+                content.title = "ScreenCap"
+                content.body = message
+                content.sound = .default
+                
+                let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                UNUserNotificationCenter.current().add(request) { error in
+                    if let error = error {
+                        print("Error showing success notification: \(error)")
+                        SentrySDK.capture(error: error)
+                    }
+                }
+            } else {
+                print("Success: \(message) (notification permission not granted)")
             }
         }
     }
     
     private func showError(_ message: String) {
-        let content = UNMutableNotificationContent()
-        content.title = "ScreenCap - Error"
-        content.body = message
-        content.sound = .default
-        
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("Error showing error notification: \(error)")
-                SentrySDK.capture(error: error)
+        checkNotificationPermission { hasPermission in
+            if hasPermission {
+                let content = UNMutableNotificationContent()
+                content.title = "ScreenCap - Error"
+                content.body = message
+                content.sound = .default
+                
+                let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                UNUserNotificationCenter.current().add(request) { error in
+                    if let error = error {
+                        print("Error showing error notification: \(error)")
+                        SentrySDK.capture(error: error)
+                    }
+                }
+            } else {
+                print("Error: \(message) (notification permission not granted)")
             }
         }
     }

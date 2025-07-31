@@ -7,21 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-01-31
+
 ### Added
-- Open source project structure
-- Comprehensive English documentation
-- Contributing guidelines
-- MIT License
+- Automated GitHub releases system with GitHub Actions
+- Dynamic versioning based on Git tags
+- Automated DMG and ZIP generation for releases
+- Release creation helper script (`create-release.sh`)
+- Comprehensive release documentation (`RELEASES.md`)
+- Installation instructions for end users
 
 ### Changed
-- Restructured project for open source distribution
-- Updated README with complete English documentation
-- Improved project architecture documentation
+- All documentation translated to English
+- Updated README with download instructions from GitHub Releases
+- Enhanced Makefile with dynamic versioning support
+- Improved distribution script with version detection
 
-### Removed
-- Internal development documentation files
-- Spanish-only documentation
-- Notarization-specific documentation
+### Fixed
+- Consistent English language across all documentation
+- Proper release workflow configuration
 
 ## [1.0.0] - 2024-01-XX
 

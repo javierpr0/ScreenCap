@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed keyboard shortcuts crash on settings tab initialization
+- Implemented safe lazy loading for KeyboardShortcuts.Recorder
+- Added proper error handling and retry mechanism for shortcuts
+- Translated all code comments to English
+
 ## [1.0.1] - 2025-01-31
 
 ### Added

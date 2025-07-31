@@ -3,9 +3,57 @@ import AppKit
 import ServiceManagement
 import KeyboardShortcuts
 import Sentry
+import Combine
+
+// ObservableObject to safely manage keyboard shortcuts state
+class KeyboardShortcutsManager: ObservableObject {
+    @Published var isLoaded = false
+    @Published var loadError: String? = nil
+    @Published var shortcuts: [KeyboardShortcuts.Name] = []
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    init() {
+        // Lazy initialization - only executed when needed
+    }
+    
+    func loadShortcuts() {
+        guard !isLoaded && loadError == nil else { return }
+        
+        // Use a small delay to avoid premature initialization
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // Verify that KeyboardShortcuts is available
+            let testShortcuts: [KeyboardShortcuts.Name] = [
+                .captureFullScreen,
+                .captureSelection,
+                .captureWindow,
+                .openSettings,
+                .quitApp
+            ]
+            
+            // Try to access each shortcut to verify they work
+            for shortcut in testShortcuts {
+                let _ = KeyboardShortcuts.getShortcut(for: shortcut)
+            }
+            
+            print("Keyboard shortcuts loaded successfully")
+            self.shortcuts = testShortcuts
+            self.isLoaded = true
+            self.loadError = nil
+        }
+    }
+    
+    func retry() {
+        loadError = nil
+        isLoaded = false
+        shortcuts = []
+        loadShortcuts()
+    }
+}
 
 struct SettingsView: View {
     @StateObject private var screenshotManager = ScreenshotManager()
+    @StateObject private var keyboardShortcutsManager = KeyboardShortcutsManager()
     @State private var filePrefix: String = ""
     @State private var includeTimestamp: Bool = false
     @State private var selectedFormat: String = "png"
@@ -368,25 +416,43 @@ struct SettingsView: View {
         .cornerRadius(12)
     }
     
-    @State private var isShortcutsTabLoaded = false
-
     private var shortcutsTab: some View {
         ScrollView {
-            if isShortcutsTabLoaded {
+            if let error = keyboardShortcutsManager.loadError {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 32))
+                        .foregroundColor(.orange)
+                    
+                    Text("Error loading shortcuts")
+                        .font(.headline)
+                    
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    Button("Retry") {
+                        keyboardShortcutsManager.retry()
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+            } else if keyboardShortcutsManager.isLoaded {
                 VStack(spacing: 20) {
                     keyboardShortcutsSection
                     shortcutsInfoSection
                 }
                 .padding(.vertical, 16)
             } else {
-                ProgressView()
+                ProgressView("Loading shortcuts...")
                     .progressViewStyle(.circular)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .onAppear {
-            print("Shortcuts tab appeared")
-            isShortcutsTabLoaded = true
+            keyboardShortcutsManager.loadShortcuts()
         }
     }
     
@@ -402,11 +468,21 @@ struct SettingsView: View {
             }
             
             VStack(alignment: .leading, spacing: 12) {
-                KeyboardShortcuts.Recorder("Full Screen Capture:", name: .captureFullScreen)
-                KeyboardShortcuts.Recorder("Selection Capture:", name: .captureSelection)
-                KeyboardShortcuts.Recorder("Window Capture:", name: .captureWindow)
-                KeyboardShortcuts.Recorder("Open Settings:", name: .openSettings)
-                KeyboardShortcuts.Recorder("Quit App:", name: .quitApp)
+                if keyboardShortcutsManager.isLoaded {
+                    SafeKeyboardShortcutRecorder("Full Screen Capture:", name: .captureFullScreen)
+                    SafeKeyboardShortcutRecorder("Selection Capture:", name: .captureSelection)
+                    SafeKeyboardShortcutRecorder("Window Capture:", name: .captureWindow)
+                    SafeKeyboardShortcutRecorder("Open Settings:", name: .openSettings)
+                    SafeKeyboardShortcutRecorder("Quit App:", name: .quitApp)
+                } else {
+                    ForEach(0..<5, id: \.self) { _ in
+                        HStack {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(height: 20)
+                        }
+                    }
+                }
             }
         }
         .padding(20)
@@ -523,6 +599,70 @@ struct SettingsView: View {
         } else {
             return "\(prefix)_1.\(selectedFormat)"
         }
+    }
+}
+
+// Safe wrapper for KeyboardShortcuts.Recorder
+struct SafeKeyboardShortcutRecorder: View {
+    let title: String
+    let name: KeyboardShortcuts.Name
+    @State private var hasError = false
+    @State private var isInitialized = false
+    
+    init(_ title: String, name: KeyboardShortcuts.Name) {
+        self.title = title
+        self.name = name
+    }
+    
+    var body: some View {
+        Group {
+            if hasError {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    Text("Error loading shortcut")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    Button("Retry") {
+                        retryInitialization()
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                }
+                .padding(.vertical, 2)
+            } else if isInitialized {
+                KeyboardShortcuts.Recorder(title, name: name)
+            } else {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .scaleEffect(0.5)
+                }
+                .padding(.vertical, 2)
+                .onAppear {
+                    initializeShortcut()
+                }
+            }
+        }
+    }
+    
+    private func initializeShortcut() {
+        // Use a small delay to avoid premature initialization
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            // Verify that the shortcut can be initialized
+            let _ = KeyboardShortcuts.getShortcut(for: name)
+            print("Successfully initialized shortcut: \(name)")
+            isInitialized = true
+            hasError = false
+        }
+    }
+    
+    private func retryInitialization() {
+        hasError = false
+        isInitialized = false
+        initializeShortcut()
     }
 }
 

@@ -8,7 +8,7 @@ import Sentry
 class ScreenshotManager: ObservableObject {
     private let userDefaults = UserDefaults.standard
     
-    // Configuraciones por defecto
+    // Default configurations
     private var filePrefix: String {
         return userDefaults.string(forKey: "filePrefix") ?? "Screenshot"
     }
@@ -18,11 +18,11 @@ class ScreenshotManager: ObservableObject {
            let url = URL(string: savedPath) {
             return url
         }
-        // Usar un valor por defecto seguro
+        // Use a safe default value
         if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
             return desktopURL
         }
-        // Fallback al directorio home del usuario
+        // Fallback to user's home directory
         return FileManager.default.homeDirectoryForCurrentUser
     }
     
@@ -40,9 +40,9 @@ class ScreenshotManager: ObservableObject {
     }
     
     init() {
-        // Configurar valores por defecto si no existen
+        // Configure default values if they don't exist
         setupDefaultSettings()
-        // Solicitar permisos de notificaciones
+        // Request notification permissions
         requestNotificationPermission()
     }
     
@@ -50,11 +50,11 @@ class ScreenshotManager: ObservableObject {
     
     private func checkScreenRecordingPermission() -> Bool {
         if #available(macOS 10.15, *) {
-            // En macOS 10.15+, verificar permisos de grabación de pantalla
+            // On macOS 10.15+, check screen recording permissions
             let runningApplication = NSRunningApplication.current
             _ = runningApplication.processIdentifier
             
-            // Intentar crear una imagen de la pantalla para verificar permisos
+            // Try to create a screen image to verify permissions
             let image = CGWindowListCreateImage(
                 CGRect(x: 0, y: 0, width: 1, height: 1),
                 .optionOnScreenOnly,
@@ -64,26 +64,26 @@ class ScreenshotManager: ObservableObject {
             
             return image != nil
         }
-        return true // En versiones anteriores no se requieren permisos especiales
+        return true // Earlier versions don't require special permissions
     }
     
     private func showPermissionAlert() {
         DispatchQueue.main.async {
             let alert = NSAlert()
-            alert.messageText = "Permisos de Grabación de Pantalla Requeridos"
-            alert.informativeText = "ScreenCap necesita permisos para capturar la pantalla.\n\n1. Ve a Configuración del Sistema > Privacidad y Seguridad\n2. Selecciona 'Grabación de Pantalla'\n3. Activa el interruptor para ScreenCap\n4. Reinicia la aplicación"
+            alert.messageText = "Screen Recording Permissions Required"
+            alert.informativeText = "ScreenCap needs permissions to capture the screen.\n\n1. Go to System Settings > Privacy & Security\n2. Select 'Screen Recording'\n3. Turn on the switch for ScreenCap\n4. Restart the application"
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "Abrir Configuración")
-            alert.addButton(withTitle: "Cancelar")
+            alert.addButton(withTitle: "Open Settings")
+            alert.addButton(withTitle: "Cancel")
             
             let response = alert.runModal()
             if response == .alertFirstButtonReturn {
-                // Abrir Configuración del Sistema
+                // Open System Settings
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
                     let opened = NSWorkspace.shared.open(url)
                     if !opened {
-                        print("No se pudo abrir Configuración del Sistema")
-                        let error = NSError(domain: "ScreenCap", code: 100, userInfo: [NSLocalizedDescriptionKey: "No se pudo abrir Configuración del Sistema"])
+                        print("Could not open System Settings")
+                        let error = NSError(domain: "ScreenCap", code: 100, userInfo: [NSLocalizedDescriptionKey: "Could not open System Settings"])
                         SentrySDK.capture(error: error)
                     }
                 }
@@ -121,12 +121,12 @@ class ScreenshotManager: ObservableObject {
         }
         
         guard let screen = NSScreen.main else {
-            showError("No se pudo acceder a la pantalla principal")
+            showError("Could not access the main screen")
             return
         }
         
         let rect = screen.frame
-        captureRect(rect, description: "pantalla completa")
+        captureRect(rect, description: "full screen")
     }
     
     func captureSelection() {
@@ -135,21 +135,21 @@ class ScreenshotManager: ObservableObject {
             return
         }
         
-        // Usar el comando nativo de macOS para selección
+        // Use macOS native command for selection
         let task = Process()
         task.launchPath = "/usr/sbin/screencapture"
         task.arguments = ["-i", "-s", "/tmp/screencap_temp.png"]
         
         task.terminationHandler = { _ in
             DispatchQueue.main.async {
-                self.processTemporaryScreenshot(description: "selección")
+                self.processTemporaryScreenshot(description: "selection")
             }
         }
         
         do {
             try task.run()
         } catch {
-            showError("Error al iniciar captura de selección: \(error.localizedDescription)")
+            showError("Error starting selection capture: \(error.localizedDescription)")
             SentrySDK.capture(error: error)
         }
     }
@@ -160,28 +160,28 @@ class ScreenshotManager: ObservableObject {
             return
         }
         
-        // Usar el comando nativo de macOS para ventana
+        // Use macOS native command for window
         let task = Process()
         task.launchPath = "/usr/sbin/screencapture"
         task.arguments = ["-i", "-w", "/tmp/screencap_temp.png"]
         
         task.terminationHandler = { _ in
             DispatchQueue.main.async {
-                self.processTemporaryScreenshot(description: "ventana")
+                self.processTemporaryScreenshot(description: "window")
             }
         }
         
         do {
             try task.run()
         } catch {
-            showError("Error al iniciar captura de ventana: \(error.localizedDescription)")
+            showError("Error starting window capture: \(error.localizedDescription)")
             SentrySDK.capture(error: error)
         }
     }
     
     private func captureRect(_ rect: NSRect, description: String) {
         guard let cgImage = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, .bestResolution) else {
-            showError("No se pudo capturar la imagen")
+            showError("Could not capture the image")
             return
         }
         
@@ -194,18 +194,18 @@ class ScreenshotManager: ObservableObject {
         
         guard FileManager.default.fileExists(atPath: tempPath),
               let nsImage = NSImage(contentsOfFile: tempPath) else {
-            // El usuario canceló la captura
+            // User cancelled the capture
             return
         }
         
         saveImage(nsImage, description: description)
         
-        // Limpiar archivo temporal
+        // Clean up temporary file
         do {
             try FileManager.default.removeItem(atPath: tempPath)
         } catch {
-            // No es crítico si falla la limpieza del archivo temporal
-            print("No se pudo eliminar archivo temporal: \(error)")
+            // It's not critical if temporary file cleanup fails
+            print("Could not delete temporary file: \(error)")
         }
     }
     
@@ -214,20 +214,20 @@ class ScreenshotManager: ObservableObject {
         let fileURL = saveDirectory.appendingPathComponent(filename)
         
         guard let imageData = getImageData(from: image) else {
-            showError("No se pudo procesar la imagen")
+            showError("Could not process the image")
             return
         }
         
         do {
             try imageData.write(to: fileURL)
-            showSuccess("Captura de \(description) guardada: \(filename)")
+            showSuccess("\(description) capture saved: \(filename)")
             
-            // Mostrar ventana flotante con la imagen capturada
+            // Show floating window with captured image
             DispatchQueue.main.async {
                 self.showFloatingPreview(image: image)
             }
         } catch {
-            showError("Error al guardar: \(error.localizedDescription)")
+            showError("Error saving: \(error.localizedDescription)")
             SentrySDK.capture(error: error)
         }
     }
@@ -245,7 +245,7 @@ class ScreenshotManager: ObservableObject {
             formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
             filename += "_\(formatter.string(from: Date()))"
         } else {
-            // Si no incluye timestamp, agregar un número secuencial
+            // If timestamp not included, add sequential number
             var counter = 1
             var testFilename: String
             repeat {
@@ -286,7 +286,7 @@ class ScreenshotManager: ObservableObject {
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("Error al mostrar notificación de éxito: \(error)")
+                print("Error showing success notification: \(error)")
                 SentrySDK.capture(error: error)
             }
         }
@@ -301,7 +301,7 @@ class ScreenshotManager: ObservableObject {
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("Error al mostrar notificación de error: \(error)")
+                print("Error showing error notification: \(error)")
                 SentrySDK.capture(error: error)
             }
         }

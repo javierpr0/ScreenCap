@@ -9,7 +9,7 @@ class FloatingPreviewWindow: NSWindow {
     
     init(image: NSImage, autoCloseTime: Double = 10.0) {
         self.autoCloseTime = autoCloseTime
-        // Calcular tamaño de la ventana basado en la imagen
+        // Calculate window size based on the image
         let maxSize = CGSize(width: 400, height: 300)
         let imageSize = image.size
         let aspectRatio = imageSize.width / imageSize.height
@@ -43,7 +43,7 @@ class FloatingPreviewWindow: NSWindow {
     }
     
     private func setupWindow(with image: NSImage) {
-        // Configurar propiedades de la ventana
+        // Configure window properties
         self.isOpaque = false
         self.backgroundColor = NSColor.clear
         self.level = .floating
@@ -51,7 +51,7 @@ class FloatingPreviewWindow: NSWindow {
         self.hasShadow = true
         self.isReleasedWhenClosed = false
         
-        // Crear vista de arrastre personalizada
+        // Create custom drag view
         guard let contentView = self.contentView else {
             print("Error: contentView is nil")
             let error = NSError(domain: "ScreenCap", code: 102, userInfo: [NSLocalizedDescriptionKey: "contentView is nil in FloatingPreviewWindow"])
@@ -65,7 +65,7 @@ class FloatingPreviewWindow: NSWindow {
         
         contentView.addSubview(dragView)
         
-        // Añadir botón de cierre
+        // Add close button
         let closeButton = NSButton(title: "✕", target: self, action: #selector(closeButtonClicked))
         closeButton.bezelStyle = .circular
         closeButton.font = NSFont.systemFont(ofSize: 12)
@@ -84,13 +84,13 @@ class FloatingPreviewWindow: NSWindow {
             print("Warning: contentView is nil when adding closeButton")
         }
         
-        // Posicionar ventana cerca del cursor
+        // Position window near cursor
         positionNearCursor()
         
-        // Configurar auto-cierre
+        // Setup auto-close
         setupAutoClose()
         
-        // Animación de aparición
+        // Appearance animation
         animateAppearance()
     }
     
@@ -107,7 +107,7 @@ class FloatingPreviewWindow: NSWindow {
             y: mouseLocation.y - frame.height - 20
         )
         
-        // Asegurar que la ventana esté dentro de la pantalla
+        // Ensure the window is within the screen bounds
         if windowOrigin.x + frame.width > screenFrame.maxX {
             windowOrigin.x = mouseLocation.x - frame.width - 20
         }
@@ -120,7 +120,7 @@ class FloatingPreviewWindow: NSWindow {
     }
     
     private func setupAutoClose() {
-        // Solo configurar el timer si el tiempo es mayor que 0
+        // Only setup timer if time is greater than 0
         guard autoCloseTime > 0 else { return }
         
         autoCloseTimer = Timer.scheduledTimer(withTimeInterval: autoCloseTime, repeats: false) { [weak self] _ in
@@ -153,7 +153,7 @@ class FloatingPreviewWindow: NSWindow {
     }
     
     override func mouseDown(with event: NSEvent) {
-        // Resetear timer al interactuar
+        // Reset timer on interaction
         autoCloseTimer?.invalidate()
         setupAutoClose()
         super.mouseDown(with: event)

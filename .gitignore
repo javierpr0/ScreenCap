@@ -43,6 +43,7 @@ Temporary Items
 
 # Development
 .reviews/
+docs/
 *.log
 *.tmp
 *.swp

@@ -1,4 +1,4 @@
-# Makefile para ScreenCap App
+# Makefile for ScreenCap App
 
 APP_NAME = ScreenCap
 BUNDLE_ID = com.screencap.ScreenCap
@@ -12,19 +12,19 @@ RESOURCES_DIR = $(CONTENTS_DIR)/Resources
 
 all: build
 
-# Compilar la aplicación
+# Build the application
 build:
-	@echo "🔨 Compilando ScreenCap..."
+	@echo "🔨 Building ScreenCap..."
 	@swift build -c release
-	@echo "📦 Creando bundle de aplicación..."
+	@echo "📦 Creating application bundle..."
 	@mkdir -p $(MACOS_DIR)
 	@mkdir -p $(RESOURCES_DIR)
 	@cp .build/release/ScreenCap $(MACOS_DIR)/
 	@cp ScreenCap.entitlements $(RESOURCES_DIR)/
-	@echo "🎨 Generando y copiando icono de la aplicación..."
+	@echo "🎨 Generating and copying application icon..."
 	@if [ ! -f ScreenCap.icns ]; then ./generate-iconset.sh; fi
 	@cp ScreenCap.icns $(RESOURCES_DIR)/
-	@echo "📝 Creando Info.plist..."
+	@echo "📝 Creating Info.plist..."
 	@echo '<?xml version="1.0" encoding="UTF-8"?>' > $(CONTENTS_DIR)/Info.plist
 	@echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $(CONTENTS_DIR)/Info.plist
 	@echo '<plist version="1.0">' >> $(CONTENTS_DIR)/Info.plist
@@ -52,50 +52,50 @@ build:
 	@echo '	<key>NSSupportsAutomaticGraphicsSwitching</key>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<true/>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<key>NSCameraUsageDescription</key>' >> $(CONTENTS_DIR)/Info.plist
-	@echo '	<string>ScreenCap necesita acceso para tomar capturas de pantalla.</string>' >> $(CONTENTS_DIR)/Info.plist
+	@echo '	<string>ScreenCap needs access to take screenshots.</string>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '	<key>NSScreenCaptureDescription</key>' >> $(CONTENTS_DIR)/Info.plist
-	@echo '	<string>ScreenCap necesita acceso para tomar capturas de pantalla.</string>' >> $(CONTENTS_DIR)/Info.plist
+	@echo '	<string>ScreenCap needs access to take screenshots.</string>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '</dict>' >> $(CONTENTS_DIR)/Info.plist
 	@echo '</plist>' >> $(CONTENTS_DIR)/Info.plist
-	@echo "🔐 Firmando la aplicación..."
+	@echo "🔐 Signing the application..."
 	@codesign --force --deep --sign - $(APP_DIR)
-	@echo "✅ Aplicación compilada exitosamente en $(APP_DIR)"
+	@echo "✅ Application compiled successfully in $(APP_DIR)"
 
-# Limpiar archivos de compilación
+# Clean build files
 clean:
-	@echo "🧹 Limpiando archivos de compilación..."
+	@echo "🧹 Cleaning build files..."
 	@rm -rf $(BUILD_DIR)
 	@swift package clean
-	@echo "✅ Limpieza completada"
+	@echo "✅ Cleanup completed"
 
-# Instalar en /Applications
+# Install in /Applications
 install: build
-	@echo "📲 Instalando ScreenCap en /Applications..."
+	@echo "📲 Installing ScreenCap in /Applications..."
 	@sudo cp -R $(APP_DIR) /Applications/
-	@echo "✅ ScreenCap instalado en /Applications"
-	@echo "💡 Puedes ejecutar la app desde Launchpad o Spotlight"
+	@echo "✅ ScreenCap installed in /Applications"
+	@echo "💡 You can run the app from Launchpad or Spotlight"
 
-# Instalar en el directorio local del usuario (no requiere sudo)
+# Install in user's local directory (no sudo required)
 install-user: build
-	@echo "📲 Instalando ScreenCap en ~/Applications..."
+	@echo "📲 Installing ScreenCap in ~/Applications..."
 	@mkdir -p ~/Applications
 	@cp -R $(APP_DIR) ~/Applications/
-	@echo "✅ ScreenCap instalado en ~/Applications"
-	@echo "💡 Puedes ejecutar la app desde Finder > Applications"
+	@echo "✅ ScreenCap installed in ~/Applications"
+	@echo "💡 You can run the app from Finder > Applications"
 
-# Ejecutar la aplicación
+# Run the application
 run: build
-	@echo "🚀 Ejecutando ScreenCap..."
+	@echo "🚀 Running ScreenCap..."
 	@open $(APP_DIR)
 
-# Ejecutar en modo debug
+# Run in debug mode
 debug:
-	@echo "🐛 Ejecutando en modo debug..."
+	@echo "🐛 Running in debug mode..."
 	@swift run
 
-# Crear DMG para distribución
+# Create DMG for distribution
 dist: build
-	@echo "📦 Creando imagen de disco para distribución..."
+	@echo "📦 Creating disk image for distribution..."
 	@mkdir -p dist
 	@rm -f dist/ScreenCap.dmg
 	@rm -rf dist/temp
@@ -104,27 +104,27 @@ dist: build
 	@ln -s /Applications dist/temp/Applications
 	@hdiutil create -volname "ScreenCap" -srcfolder dist/temp -ov -format UDBZ dist/ScreenCap.dmg
 	@rm -rf dist/temp
-	@echo "✅ DMG creado en dist/ScreenCap.dmg"
-	@echo "📏 Tamaño del archivo: $$(du -h dist/ScreenCap.dmg | cut -f1)"
+	@echo "✅ DMG created at dist/ScreenCap.dmg"
+	@echo "📏 File size: $$(du -h dist/ScreenCap.dmg | cut -f1)"
 
-# Crear ZIP para distribución
+# Create ZIP for distribution
 zip: build
-	@echo "🗜️ Creando archivo ZIP para distribución..."
+	@echo "🗜️ Creating ZIP file for distribution..."
 	@mkdir -p dist
 	@rm -f dist/ScreenCap.zip
 	@cd $(BUILD_DIR) && zip -r ../dist/ScreenCap.zip $(APP_NAME).app
-	@echo "✅ ZIP creado en dist/ScreenCap.zip"
-	@echo "📏 Tamaño del archivo: $$(du -h dist/ScreenCap.zip | cut -f1)"
+	@echo "✅ ZIP created at dist/ScreenCap.zip"
+	@echo "📏 File size: $$(du -h dist/ScreenCap.zip | cut -f1)"
 
-# Mostrar ayuda
+# Show help
 help:
-	@echo "Comandos disponibles:"
-	@echo "  make build       - Compilar la aplicación"
-	@echo "  make clean       - Limpiar archivos de compilación"
-	@echo "  make install     - Instalar en /Applications (requiere sudo)"
-	@echo "  make install-user - Instalar en ~/Applications (sin sudo)"
-	@echo "  make run         - Ejecutar la aplicación"
-	@echo "  make debug       - Ejecutar en modo debug"
-	@echo "  make dist        - Crear DMG para distribución"
-	@echo "  make zip         - Crear ZIP para distribución"
-	@echo "  make help        - Mostrar esta ayuda"
+	@echo "Available commands:"
+	@echo "  make build       - Build the application"
+	@echo "  make clean       - Clean build files"
+	@echo "  make install     - Install in /Applications (requires sudo)"
+	@echo "  make install-user - Install in ~/Applications (no sudo)"
+	@echo "  make run         - Run the application"
+	@echo "  make debug       - Run in debug mode"
+	@echo "  make dist        - Create DMG for distribution"
+	@echo "  make zip         - Create ZIP for distribution"
+	@echo "  make help        - Show this help"

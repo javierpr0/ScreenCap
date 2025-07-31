@@ -1,150 +1,150 @@
 #!/bin/bash
 
-# Script de distribución para ScreenCap
-# Este script crea una versión completamente independiente de la aplicación
+# Distribution script for ScreenCap
+# This script creates a completely standalone version of the application
 
-echo "🚀 Iniciando proceso de distribución para ScreenCap..."
+echo "🚀 Starting distribution process for ScreenCap..."
 
-# Colores para output
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Verificar que estamos en el directorio correcto
+# Verify we are in the correct directory
 if [ ! -f "Package.swift" ]; then
-    echo -e "${RED}Error: Este script debe ejecutarse desde el directorio raíz del proyecto${NC}"
+    echo -e "${RED}Error: This script must be run from the project root directory${NC}"
     exit 1
 fi
 
-# Limpiar compilaciones anteriores
-echo "🧹 Limpiando compilaciones anteriores..."
+# Clean previous builds
+echo "🧹 Cleaning previous builds..."
 make clean
 
-# Compilar en modo release con optimizaciones
-echo "🔨 Compilando aplicación en modo release..."
+# Compile in release mode with optimizations
+echo "🔨 Compiling application in release mode..."
 swift build -c release -Xswiftc -O
 
-# Crear el bundle de la aplicación
-echo "📦 Creando bundle de aplicación..."
+# Create the application bundle
+echo "📦 Creating application bundle..."
 make build
 
-# Verificar que la aplicación se compiló correctamente
+# Verify the application compiled correctly
 if [ ! -d ".build/ScreenCap.app" ]; then
-    echo -e "${RED}Error: La aplicación no se compiló correctamente${NC}"
+    echo -e "${RED}Error: The application did not compile correctly${NC}"
     exit 1
 fi
 
-# Crear directorio de distribución
-echo "📁 Preparando directorio de distribución..."
+# Create distribution directory
+echo "📁 Preparing distribution directory..."
 rm -rf dist
 mkdir -p dist
 
-# Opción 1: Crear DMG
-echo "💿 Creando imagen de disco (DMG)..."
+# Option 1: Create DMG
+echo "💿 Creating disk image (DMG)..."
 mkdir -p dist/dmg-temp
 cp -R .build/ScreenCap.app dist/dmg-temp/
 ln -s /Applications dist/dmg-temp/Applications
 
-# Crear README para el DMG
+# Create README for the DMG
 cat > dist/dmg-temp/README.txt << EOF
-ScreenCap - Herramienta de captura de pantalla para macOS
+ScreenCap - Screenshot capture tool for macOS
 
-INSTALACIÓN:
-1. Arrastra ScreenCap.app a la carpeta Applications
-2. La primera vez que ejecutes la aplicación, macOS te pedirá permisos
-3. Ve a Preferencias del Sistema > Seguridad y Privacidad > Privacidad > Grabación de pantalla
-4. Marca la casilla junto a ScreenCap
+INSTALLATION:
+1. Drag ScreenCap.app to the Applications folder
+2. The first time you run the application, macOS will request permissions
+3. Go to System Settings > Privacy & Security > Privacy > Screen Recording
+4. Check the box next to ScreenCap
 
-USO:
-- La aplicación se ejecuta en la barra de menú (arriba a la derecha)
-- Haz clic en el icono de la cámara para ver las opciones
-- Atajos de teclado:
-  • ⌘⇧1: Captura pantalla completa
-  • ⌘⇧2: Captura de selección
-  • ⌘⇧3: Captura de ventana
+USAGE:
+- The application runs in the menu bar (top right)
+- Click the camera icon to see options
+- Keyboard shortcuts:
+  • ⌘⇧1: Full screen capture
+  • ⌘⇧2: Selection capture
+  • ⌘⇧3: Window capture
 
-¡Disfruta usando ScreenCap!
+Enjoy using ScreenCap!
 EOF
 
-# Crear el DMG
+# Create the DMG
 hdiutil create -volname "ScreenCap" -srcfolder dist/dmg-temp -ov -format UDBZ dist/ScreenCap.dmg
 rm -rf dist/dmg-temp
 
-# Opción 2: Crear ZIP
-echo "🗜️ Creando archivo ZIP..."
+# Option 2: Create ZIP
+echo "🗜️ Creating ZIP file..."
 cd .build
 zip -r ../dist/ScreenCap.zip ScreenCap.app -x "*.DS_Store"
 cd ..
 
-# Crear archivo de instrucciones
-cat > dist/INSTRUCCIONES.txt << EOF
-INSTRUCCIONES DE INSTALACIÓN - ScreenCap
+# Create instructions file
+cat > dist/INSTALLATION_INSTRUCTIONS.txt << EOF
+INSTALLATION INSTRUCTIONS - ScreenCap
 
-=== IMPORTANTE ===
-La primera vez que ejecutes ScreenCap, macOS mostrará advertencias de seguridad.
-Esto es normal para aplicaciones descargadas de Internet.
+=== IMPORTANT ===
+The first time you run ScreenCap, macOS will show security warnings.
+This is normal for applications downloaded from the Internet.
 
-=== PASOS DE INSTALACIÓN ===
+=== INSTALLATION STEPS ===
 
-1. DESCOMPRIMIR (si descargaste el ZIP):
-   - Haz doble clic en ScreenCap.zip
-   - Se creará ScreenCap.app
+1. EXTRACT (if you downloaded the ZIP):
+   - Double-click on ScreenCap.zip
+   - ScreenCap.app will be created
 
-2. INSTALAR:
-   - Arrastra ScreenCap.app a tu carpeta Aplicaciones
+2. INSTALL:
+   - Drag ScreenCap.app to your Applications folder
 
-3. PRIMERA EJECUCIÓN:
-   - Haz clic derecho en ScreenCap.app
-   - Selecciona "Abrir"
-   - Aparecerá una advertencia de seguridad
-   - Haz clic en "Abrir" nuevamente
+3. FIRST RUN:
+   - Right-click on ScreenCap.app
+   - Select "Open"
+   - A security warning will appear
+   - Click "Open" again
 
-4. PERMISOS NECESARIOS:
-   - Ve a: Preferencias del Sistema > Seguridad y Privacidad
-   - Selecciona la pestaña "Privacidad"
-   - En la lista izquierda, selecciona "Grabación de pantalla"
-   - Marca la casilla junto a ScreenCap
-   - Es posible que necesites reiniciar la aplicación
+4. REQUIRED PERMISSIONS:
+   - Go to: System Settings > Privacy & Security
+   - Select the "Privacy" tab
+   - In the left list, select "Screen Recording"
+   - Check the box next to ScreenCap
+   - You may need to restart the application
 
-=== SOLUCIÓN DE PROBLEMAS ===
+=== TROUBLESHOOTING ===
 
-Si macOS dice "ScreenCap está dañado":
-1. Abre Terminal
-2. Ejecuta: xattr -cr /Applications/ScreenCap.app
-3. Intenta abrir la aplicación nuevamente
+If macOS says "ScreenCap is damaged":
+1. Open Terminal
+2. Run: xattr -cr /Applications/ScreenCap.app
+3. Try opening the application again
 
-Si los atajos de teclado no funcionan:
-1. Ve a: Preferencias del Sistema > Seguridad y Privacidad > Privacidad > Accesibilidad
-2. Añade ScreenCap a la lista y marca la casilla
+If keyboard shortcuts don't work:
+1. Go to: System Settings > Privacy & Security > Privacy > Accessibility
+2. Add ScreenCap to the list and check the box
 
-=== DESINSTALACIÓN ===
-1. Arrastra ScreenCap.app desde Aplicaciones a la Papelera
-2. Vacía la Papelera
+=== UNINSTALLATION ===
+1. Drag ScreenCap.app from Applications to Trash
+2. Empty Trash
 
-Disfruta usando ScreenCap!
+Enjoy using ScreenCap!
 EOF
 
-# Mostrar información del build
+# Show build information
 echo ""
-echo -e "${GREEN}✅ Distribución completada exitosamente!${NC}"
+echo -e "${GREEN}✅ Distribution completed successfully!${NC}"
 echo ""
-echo "📦 Archivos creados:"
+echo "📦 Files created:"
 echo "  - dist/ScreenCap.dmg ($(du -h dist/ScreenCap.dmg | cut -f1))"
 echo "  - dist/ScreenCap.zip ($(du -h dist/ScreenCap.zip | cut -f1))"
-echo "  - dist/INSTRUCCIONES.txt"
+echo "  - dist/INSTALLATION_INSTRUCTIONS.txt"
 echo ""
-echo -e "${YELLOW}📋 Información de la compilación:${NC}"
-echo "  - Arquitectura: $(uname -m)"
-echo "  - macOS versión mínima: 14.0"
+echo -e "${YELLOW}📋 Build information:${NC}"
+echo "  - Architecture: $(uname -m)"
+echo "  - Minimum macOS version: 14.0"
 echo "  - Swift version: $(swift --version | head -n 1)"
 echo ""
-echo -e "${YELLOW}🔐 Firma de código:${NC}"
-echo "  - La aplicación está firmada localmente (ad-hoc)"
-echo "  - Los usuarios verán advertencias de seguridad en la primera ejecución"
-echo "  - Para distribución sin advertencias, necesitas:"
-echo "    • Una cuenta de desarrollador de Apple (\$99/año)"
-echo "    • Firmar con un certificado válido"
-echo "    • Notarizar la aplicación con Apple"
+echo -e "${YELLOW}🔐 Code signing:${NC}"
+echo "  - The application is signed locally (ad-hoc)"
+echo "  - Users will see security warnings on first run"
+echo "  - For distribution without warnings, you need:"
+echo "    • An Apple Developer account (\$99/year)"
+echo "    • Sign with a valid certificate"
+echo "    • Notarize the application with Apple"
 echo ""
-echo "📨 Los archivos están listos para compartir en la carpeta 'dist/'"
+echo "📨 Files are ready to share in the 'dist/' folder"

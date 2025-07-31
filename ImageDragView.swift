@@ -28,7 +28,7 @@ class ImageDragView: NSImageView {
         self.layer?.cornerRadius = 8
         self.layer?.masksToBounds = true
         
-        // Configurar tracking area para hover effects
+        // Configure tracking area for hover effects
         updateTrackingAreas()
     }
     
@@ -80,28 +80,28 @@ class ImageDragView: NSImageView {
             return
         }
         
-        // Preparar datos para arrastre
+        // Prepare data for dragging
         let pasteboardItem = NSPasteboardItem()
         
-        // Agregar imagen como TIFF
+        // Add image as TIFF
         if let tiffData = image.tiffRepresentation {
             pasteboardItem.setData(tiffData, forType: .tiff)
         }
         
-        // Agregar imagen como PNG
+        // Add image as PNG
         if let pngData = image.pngData {
             pasteboardItem.setData(pngData, forType: .png)
         }
         
-        // Crear archivo temporal para arrastre a carpetas
+        // Create temporary file for dragging to folders
         if let tempFileURL = createTemporaryImageFile(image: image) {
             pasteboardItem.setString(tempFileURL.absoluteString, forType: .fileURL)
         }
         
-        // Crear sesión de arrastre
+        // Create dragging session
         let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
         
-        // Configurar imagen de arrastre
+        // Configure drag image
         let dragImageSize = CGSize(width: 64, height: 64)
         let dragImage = createDragImage(from: image, size: dragImageSize)
         
@@ -110,7 +110,7 @@ class ImageDragView: NSImageView {
             contents: dragImage
         )
         
-        // Iniciar sesión de arrastre
+        // Start dragging session
         let draggingSession = beginDraggingSession(
             with: [draggingItem],
             event: event,
@@ -125,11 +125,11 @@ class ImageDragView: NSImageView {
         
         dragImage.lockFocus()
         
-        // Dibujar fondo semi-transparente
+        // Draw semi-transparent background
         NSColor.black.withAlphaComponent(0.1).setFill()
         NSRect(origin: .zero, size: size).fill()
         
-        // Dibujar imagen escalada
+        // Draw scaled image
         let imageRect = NSRect(origin: .zero, size: size).insetBy(dx: 4, dy: 4)
         image.draw(in: imageRect)
         
@@ -166,7 +166,7 @@ extension ImageDragView: NSDraggingSource {
     
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
         if operation == .copy {
-            // Cerrar ventana flotante después de arrastre exitoso
+            // Close floating window after successful drag
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 if let window = self.window as? FloatingPreviewWindow {
                     window.closeWithAnimation()

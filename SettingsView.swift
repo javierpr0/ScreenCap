@@ -18,12 +18,12 @@ struct SettingsView: View {
     
     let imageFormats = ["png", "jpg", "jpeg"]
     let previewTimes = [
-        (value: 3.0, label: "3 segundos"),
-        (value: 5.0, label: "5 segundos"),
-        (value: 10.0, label: "10 segundos"),
-        (value: 15.0, label: "15 segundos"),
-        (value: 30.0, label: "30 segundos"),
-        (value: 0.0, label: "No cerrar automáticamente")
+        (value: 3.0, label: "3 seconds"),
+        (value: 5.0, label: "5 seconds"),
+        (value: 10.0, label: "10 seconds"),
+        (value: 15.0, label: "15 seconds"),
+        (value: 30.0, label: "30 seconds"),
+        (value: 0.0, label: "Don't close automatically")
     ]
     
     var body: some View {
@@ -43,7 +43,7 @@ struct SettingsView: View {
                 shortcutsTab
                     .tag(1)
                     .tabItem {
-                        Label("Atajos", systemImage: "keyboard")
+                        Label("Shortcuts", systemImage: "keyboard")
                     }
             }
             .padding(.horizontal, 24)
@@ -69,7 +69,7 @@ struct SettingsView: View {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                print("Error al configurar lanzamiento al inicio: \(error)")
+                print("Error configuring launch at startup: \(error)")
                 SentrySDK.capture(error: error)
                 launchAtLogin = !newValue
             }
@@ -95,7 +95,7 @@ struct SettingsView: View {
                     .font(.system(size: 24, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
                 
-                Text("Configuración")
+                Text("Settings")
                     .font(.system(size: 14))
                     .foregroundColor(.secondary)
             }
@@ -123,18 +123,18 @@ struct SettingsView: View {
                 Image(systemName: "doc.text")
                     .font(.system(size: 16))
                     .foregroundColor(.accentColor)
-                Text("Nombre de archivo")
+                Text("File name")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
             }
             
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Prefijo")
+                    Text("Prefix")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                     
-                    TextField("Ejemplo: Captura", text: $filePrefix)
+                    TextField("Example: Screenshot", text: $filePrefix)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: filePrefix) { _, newValue in
                             screenshotManager.updatePrefix(newValue)
@@ -144,9 +144,9 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle(isOn: $includeTimestamp) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Incluir fecha y hora")
+                            Text("Include date and time")
                                 .font(.system(size: 14))
-                            Text("Añade un timestamp único a cada archivo")
+                            Text("Add a unique timestamp to each file")
                                 .font(.system(size: 12))
                                 .foregroundColor(.secondary)
                         }
@@ -161,7 +161,7 @@ struct SettingsView: View {
                     Image(systemName: "eye")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
-                    Text("Vista previa: ")
+                    Text("Preview: ")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                     Text(getPreviewFilename())
@@ -185,7 +185,7 @@ struct SettingsView: View {
                 Image(systemName: "photo")
                     .font(.system(size: 16))
                     .foregroundColor(.accentColor)
-                Text("Formato de imagen")
+                Text("Image format")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
             }
@@ -205,7 +205,7 @@ struct SettingsView: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(selectedFormat == format ? .white : .primary)
                             
-                            Text(format == "png" ? "Sin pérdida" : "Comprimido")
+                            Text(format == "png" ? "Lossless" : "Compressed")
                                 .font(.system(size: 10))
                                 .foregroundColor(selectedFormat == format ? .white.opacity(0.9) : .secondary)
                         }
@@ -234,7 +234,7 @@ struct SettingsView: View {
                 Image(systemName: "folder")
                     .font(.system(size: 16))
                     .foregroundColor(.accentColor)
-                Text("Ubicación de guardado")
+                Text("Save Location")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
             }
@@ -260,7 +260,7 @@ struct SettingsView: View {
                     Spacer()
                     
                     Button(action: { showingDirectoryPicker = true }) {
-                        Text("Cambiar")
+                        Text("Change")
                             .font(.system(size: 13))
                     }
                     .buttonStyle(.bordered)
@@ -273,15 +273,15 @@ struct SettingsView: View {
                     Button(action: {
                         let opened = NSWorkspace.shared.open(saveDirectory)
                         if !opened {
-                            print("No se pudo abrir el directorio: \(saveDirectory)")
-                            let error = NSError(domain: "ScreenCap", code: 101, userInfo: [NSLocalizedDescriptionKey: "No se pudo abrir el directorio en Finder"])
+                            print("Could not open directory: \(saveDirectory)")
+                            let error = NSError(domain: "ScreenCap", code: 101, userInfo: [NSLocalizedDescriptionKey: "Could not open directory in Finder"])
                             SentrySDK.capture(error: error)
                         }
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.up.forward.square")
                                 .font(.system(size: 12))
-                            Text("Abrir en Finder")
+                            Text("Open in Finder")
                                 .font(.system(size: 12))
                         }
                     }
@@ -302,13 +302,13 @@ struct SettingsView: View {
                 Image(systemName: "clock")
                     .font(.system(size: 16))
                     .foregroundColor(.accentColor)
-                Text("Vista previa flotante")
+                Text("Floating preview")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
             }
             
             VStack(alignment: .leading, spacing: 12) {
-                Text("Tiempo antes de cerrar automáticamente")
+                Text("Time before auto-close")
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
                 
@@ -328,8 +328,8 @@ struct SettingsView: View {
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                     Text(floatingPreviewTime == 0 ? 
-                         "La ventana permanecerá abierta hasta que la cierres manualmente" :
-                         "La ventana se cerrará automáticamente después del tiempo seleccionado")
+                         "The window will remain open until you close it manually" :
+                        "The window will close automatically after the selected time")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .lineLimit(2)
@@ -351,15 +351,15 @@ struct SettingsView: View {
                 Image(systemName: "arrow.up.forward.app")
                     .font(.system(size: 16))
                     .foregroundColor(.accentColor)
-                Text("Lanzamiento al inicio")
+                Text("Launch at startup")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
             }
             
-            Toggle("Iniciar ScreenCap al encender la Mac", isOn: $launchAtLogin)
+            Toggle("Launch ScreenCap when Mac starts up", isOn: $launchAtLogin)
                 .toggleStyle(SwitchToggleStyle())
             
-            Text("La aplicación se ejecutará automáticamente en segundo plano al iniciar sesión.")
+            Text("The application will run automatically in the background at login.")
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
         }
@@ -396,17 +396,17 @@ struct SettingsView: View {
                 Image(systemName: "keyboard")
                     .font(.system(size: 16))
                     .foregroundColor(.accentColor)
-                Text("Atajos de teclado globales")
+                Text("Global keyboard shortcuts")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
             }
             
             VStack(alignment: .leading, spacing: 12) {
-                KeyboardShortcuts.Recorder("Captura pantalla completa:", name: .captureFullScreen)
-                KeyboardShortcuts.Recorder("Captura de selección:", name: .captureSelection)
-                KeyboardShortcuts.Recorder("Captura de ventana:", name: .captureWindow)
-                KeyboardShortcuts.Recorder("Abrir configuración:", name: .openSettings)
-                KeyboardShortcuts.Recorder("Salir de la app:", name: .quitApp)
+                KeyboardShortcuts.Recorder("Full Screen Capture:", name: .captureFullScreen)
+                KeyboardShortcuts.Recorder("Selection Capture:", name: .captureSelection)
+                KeyboardShortcuts.Recorder("Window Capture:", name: .captureWindow)
+                KeyboardShortcuts.Recorder("Open Settings:", name: .openSettings)
+                KeyboardShortcuts.Recorder("Quit App:", name: .quitApp)
             }
         }
         .padding(20)
@@ -420,7 +420,7 @@ struct SettingsView: View {
                 Image(systemName: "info.circle")
                     .font(.system(size: 16))
                     .foregroundColor(.accentColor)
-                Text("Información")
+                Text("Information")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
             }
@@ -430,7 +430,7 @@ struct SettingsView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 14))
                         .foregroundColor(.green)
-                    Text("Los atajos funcionan globalmente en cualquier aplicación")
+                    Text("Shortcuts work globally in any application")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
@@ -439,7 +439,7 @@ struct SettingsView: View {
                     Image(systemName: "lightbulb.fill")
                         .font(.system(size: 14))
                         .foregroundColor(.orange)
-                    Text("Las capturas se guardan automáticamente en la carpeta configurada")
+                    Text("Screenshots are automatically saved to the configured folder")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
@@ -448,7 +448,7 @@ struct SettingsView: View {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 14))
                         .foregroundColor(.blue)
-                    Text("Mantén presionado Espacio durante la selección para mover el área")
+                    Text("Hold Space during selection to move the area")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
@@ -470,7 +470,7 @@ struct SettingsView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "camera.fill")
                         .font(.system(size: 14))
-                    Text("Probar Captura")
+                    Text("Test Capture")
                         .font(.system(size: 14, weight: .medium))
                 }
                 .frame(maxWidth: .infinity)
@@ -483,7 +483,7 @@ struct SettingsView: View {
             Button(action: {
                 NSApp.keyWindow?.close()
             }) {
-                Text("Cerrar")
+                Text("Close")
                     .font(.system(size: 14))
             }
             .buttonStyle(.bordered)
@@ -514,7 +514,7 @@ struct SettingsView: View {
     }
     
     private func getPreviewFilename() -> String {
-        let prefix = filePrefix.isEmpty ? "Captura" : filePrefix
+        let prefix = filePrefix.isEmpty ? "Screenshot" : filePrefix
         if includeTimestamp {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"

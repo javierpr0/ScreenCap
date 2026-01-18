@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Sentry
+import ScreenCapCore
 
 class ImageDragView: NSImageView {
     private var trackingArea: NSTrackingArea?
@@ -151,7 +152,7 @@ class ImageDragView: NSImageView {
             try pngData.write(to: tempFileURL)
             return tempFileURL
         } catch {
-            print("Error creating temporary file: \(error)")
+            Logger.error("Error creating temporary file", error: error, category: .fileOperations)
             SentrySDK.capture(error: error)
             return nil
         }

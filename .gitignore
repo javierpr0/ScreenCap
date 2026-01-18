@@ -72,6 +72,9 @@ docs/
 *.crt
 *.cer
 
+# Configuration files with secrets
+SentryConfig.plist
+
 # Temporary files
 Thumbs.db
 ehthumbs.db

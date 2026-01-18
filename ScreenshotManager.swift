@@ -5,6 +5,7 @@ import UserNotifications
 import AVFoundation
 import Sentry
 import ScreenCaptureKit
+import ScreenCapCore
 
 class ScreenshotManager: ObservableObject {
     private let userDefaults = UserDefaults.standard
@@ -48,32 +49,18 @@ class ScreenshotManager: ObservableObject {
     }
     
     // MARK: - Permission Checking
-    
-    private func checkScreenRecordingPermission() -> Bool {
-        // Since our target is macOS 14.0+, we can use ScreenCaptureKit directly
-        return checkScreenCaptureKitPermission()
-    }
-    
-    @available(macOS 14.0, *)
-    private func checkScreenCaptureKitPermission() -> Bool {
-        // Use ScreenCaptureKit to check if we can access screen content
-        let semaphore = DispatchSemaphore(value: 0)
-        var hasPermission = false
-        
-        Task {
-            do {
-                // Try to get shareable content - this requires screen recording permission
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                hasPermission = !content.displays.isEmpty
-            } catch {
-                hasPermission = false
-            }
-            semaphore.signal()
+
+    /// Checks screen recording permission asynchronously using ScreenCaptureKit
+    /// - Returns: True if permission is granted, false otherwise
+    private func checkScreenRecordingPermission() async -> Bool {
+        do {
+            // Try to get shareable content - this requires screen recording permission
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            return !content.displays.isEmpty
+        } catch {
+            Logger.debug("Screen recording permission check failed: \(error.localizedDescription)", category: .permissions)
+            return false
         }
-        
-        // Wait for async operation with timeout
-        _ = semaphore.wait(timeout: .now() + 3.0)
-        return hasPermission
     }
     
     
@@ -92,7 +79,7 @@ class ScreenshotManager: ObservableObject {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
                     let opened = NSWorkspace.shared.open(url)
                     if !opened {
-                        print("Could not open System Settings")
+                        Logger.error("Could not open System Settings", category: .permissions)
                         let error = NSError(domain: "ScreenCap", code: 100, userInfo: [NSLocalizedDescriptionKey: "Could not open System Settings"])
                         SentrySDK.capture(error: error)
                     }
@@ -116,10 +103,10 @@ class ScreenshotManager: ObservableObject {
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error = error {
-                print("Error requesting notification permission: \(error)")
+                Logger.error("Error requesting notification permission", error: error, category: .permissions)
                 SentrySDK.capture(error: error)
             } else {
-                print("Notification permission granted: \(granted)")
+                Logger.debug("Notification permission granted: \(granted)", category: .permissions)
             }
         }
     }
@@ -133,39 +120,51 @@ class ScreenshotManager: ObservableObject {
     }
     
     // MARK: - Capture Methods
-    
+
     func captureFullScreen() {
-        guard checkScreenRecordingPermission() else {
-            showPermissionAlert()
+        Task {
+            await captureFullScreenAsync()
+        }
+    }
+
+    private func captureFullScreenAsync() async {
+        guard await checkScreenRecordingPermission() else {
+            await MainActor.run { showPermissionAlert() }
             return
         }
-        
+
         guard let screen = NSScreen.main else {
             showError("Could not access the main screen")
             return
         }
-        
+
         let rect = screen.frame
-        captureRect(rect, description: "full screen")
+        await captureRectAsync(rect, description: "full screen")
     }
-    
+
     func captureSelection() {
-        guard checkScreenRecordingPermission() else {
-            showPermissionAlert()
+        Task {
+            await captureSelectionAsync()
+        }
+    }
+
+    private func captureSelectionAsync() async {
+        guard await checkScreenRecordingPermission() else {
+            await MainActor.run { showPermissionAlert() }
             return
         }
-        
+
         // Use macOS native command for selection
         let task = Process()
         task.launchPath = "/usr/sbin/screencapture"
         task.arguments = ["-i", "-s", "/tmp/screencap_temp.png"]
-        
-        task.terminationHandler = { _ in
+
+        task.terminationHandler = { [weak self] _ in
             DispatchQueue.main.async {
-                self.processTemporaryScreenshot(description: "selection")
+                self?.processTemporaryScreenshot(description: "selection")
             }
         }
-        
+
         do {
             try task.run()
         } catch {
@@ -173,24 +172,30 @@ class ScreenshotManager: ObservableObject {
             SentrySDK.capture(error: error)
         }
     }
-    
+
     func captureWindow() {
-        guard checkScreenRecordingPermission() else {
-            showPermissionAlert()
+        Task {
+            await captureWindowAsync()
+        }
+    }
+
+    private func captureWindowAsync() async {
+        guard await checkScreenRecordingPermission() else {
+            await MainActor.run { showPermissionAlert() }
             return
         }
-        
+
         // Use macOS native command for window
         let task = Process()
         task.launchPath = "/usr/sbin/screencapture"
         task.arguments = ["-i", "-w", "/tmp/screencap_temp.png"]
-        
-        task.terminationHandler = { _ in
+
+        task.terminationHandler = { [weak self] _ in
             DispatchQueue.main.async {
-                self.processTemporaryScreenshot(description: "window")
+                self?.processTemporaryScreenshot(description: "window")
             }
         }
-        
+
         do {
             try task.run()
         } catch {
@@ -199,53 +204,46 @@ class ScreenshotManager: ObservableObject {
         }
     }
     
-    private func captureRect(_ rect: NSRect, description: String) {
-        // Since our target is macOS 14.0+, we can use ScreenCaptureKit directly
-        captureRectWithScreenCaptureKit(rect, description: description)
-    }
-    
-    @available(macOS 14.0, *)
-    private func captureRectWithScreenCaptureKit(_ rect: NSRect, description: String) {
-        Task {
-            do {
-                // Get available displays
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                
-                guard let display = content.displays.first else {
-                    await MainActor.run {
-                        self.showError("No display found")
-                    }
-                    return
-                }
-                
-                // Create content filter for the display
-                let filter = SCContentFilter(display: display, excludingWindows: [])
-                
-                // Configure screenshot parameters
-                let configuration = SCStreamConfiguration()
-                configuration.width = Int(rect.width)
-                configuration.height = Int(rect.height)
-                configuration.sourceRect = rect
-                configuration.showsCursor = true
-                configuration.scalesToFit = false
-                
-                // Capture the screenshot
-                let cgImage = try await SCScreenshotManager.captureImage(
-                    contentFilter: filter,
-                    configuration: configuration
-                )
-                
-                // Convert to NSImage and save on main thread
+    /// Captures a specific rectangle of the screen using ScreenCaptureKit
+    private func captureRectAsync(_ rect: NSRect, description: String) async {
+        do {
+            // Get available displays
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+            guard let display = content.displays.first else {
                 await MainActor.run {
-                    let nsImage = NSImage(cgImage: cgImage, size: rect.size)
-                    self.saveImage(nsImage, description: description)
+                    self.showError("No display found")
                 }
-                
-            } catch {
-                await MainActor.run {
-                    self.showError("ScreenCaptureKit error: \(error.localizedDescription)")
-                    SentrySDK.capture(error: error)
-                }
+                return
+            }
+
+            // Create content filter for the display
+            let filter = SCContentFilter(display: display, excludingWindows: [])
+
+            // Configure screenshot parameters
+            let configuration = SCStreamConfiguration()
+            configuration.width = Int(rect.width)
+            configuration.height = Int(rect.height)
+            configuration.sourceRect = rect
+            configuration.showsCursor = true
+            configuration.scalesToFit = false
+
+            // Capture the screenshot
+            let cgImage = try await SCScreenshotManager.captureImage(
+                contentFilter: filter,
+                configuration: configuration
+            )
+
+            // Convert to NSImage and save on main thread
+            await MainActor.run {
+                let nsImage = NSImage(cgImage: cgImage, size: rect.size)
+                self.saveImage(nsImage, description: description)
+            }
+
+        } catch {
+            await MainActor.run {
+                self.showError("ScreenCaptureKit error: \(error.localizedDescription)")
+                SentrySDK.capture(error: error)
             }
         }
     }
@@ -266,7 +264,7 @@ class ScreenshotManager: ObservableObject {
             try FileManager.default.removeItem(atPath: tempPath)
         } catch {
             // It's not critical if temporary file cleanup fails
-            print("Could not delete temporary file: \(error)")
+            Logger.warning("Could not delete temporary file: \(error.localizedDescription)", category: .fileOperations)
         }
     }
     
@@ -349,12 +347,12 @@ class ScreenshotManager: ObservableObject {
                 let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
                 UNUserNotificationCenter.current().add(request) { error in
                     if let error = error {
-                        print("Error showing success notification: \(error)")
+                        Logger.error("Error showing success notification", error: error, category: .ui)
                         SentrySDK.capture(error: error)
                     }
                 }
             } else {
-                print("Success: \(message) (notification permission not granted)")
+                Logger.info("Success: \(message) (notification permission not granted)", category: .ui)
             }
         }
     }
@@ -370,20 +368,21 @@ class ScreenshotManager: ObservableObject {
                 let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
                 UNUserNotificationCenter.current().add(request) { error in
                     if let error = error {
-                        print("Error showing error notification: \(error)")
+                        Logger.error("Error showing error notification", error: error, category: .ui)
                         SentrySDK.capture(error: error)
                     }
                 }
             } else {
-                print("Error: \(message) (notification permission not granted)")
+                Logger.warning("Error: \(message) (notification permission not granted)", category: .ui)
             }
         }
     }
     
     // MARK: - Settings Management
-    
+
     func updatePrefix(_ newPrefix: String) {
-        userDefaults.set(newPrefix, forKey: "filePrefix")
+        let sanitized = FilePrefixValidator.sanitize(newPrefix)
+        userDefaults.set(sanitized, forKey: "filePrefix")
     }
     
     func updateSaveDirectory(_ newDirectory: URL) {

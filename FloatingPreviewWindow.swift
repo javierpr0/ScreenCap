@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Sentry
+import ScreenCapCore
 
 class FloatingPreviewWindow: NSWindow {
     private var dragView: ImageDragView!
@@ -53,7 +54,7 @@ class FloatingPreviewWindow: NSWindow {
         
         // Create custom drag view
         guard let contentView = self.contentView else {
-            print("Error: contentView is nil")
+            Logger.error("contentView is nil in FloatingPreviewWindow", category: .ui)
             let error = NSError(domain: "ScreenCap", code: 102, userInfo: [NSLocalizedDescriptionKey: "contentView is nil in FloatingPreviewWindow"])
             SentrySDK.capture(error: error)
             return
@@ -81,7 +82,7 @@ class FloatingPreviewWindow: NSWindow {
         if let contentView = self.contentView {
             contentView.addSubview(closeButton)
         } else {
-            print("Warning: contentView is nil when adding closeButton")
+            Logger.warning("contentView is nil when adding closeButton", category: .ui)
         }
         
         // Position window near cursor

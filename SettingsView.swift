@@ -4,6 +4,7 @@ import ServiceManagement
 import KeyboardShortcuts
 import Sentry
 import Combine
+import ScreenCapCore
 
 // ObservableObject to safely manage keyboard shortcuts state
 class KeyboardShortcutsManager: ObservableObject {
@@ -35,8 +36,8 @@ class KeyboardShortcutsManager: ObservableObject {
             for shortcut in testShortcuts {
                 let _ = KeyboardShortcuts.getShortcut(for: shortcut)
             }
-            
-            print("Keyboard shortcuts loaded successfully")
+
+            Logger.debug("Keyboard shortcuts loaded successfully", category: .shortcuts)
             self.shortcuts = testShortcuts
             self.isLoaded = true
             self.loadError = nil
@@ -117,7 +118,7 @@ struct SettingsView: View {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                print("Error configuring launch at startup: \(error)")
+                Logger.error("Error configuring launch at startup", error: error, category: .settings)
                 SentrySDK.capture(error: error)
                 launchAtLogin = !newValue
             }
@@ -321,7 +322,7 @@ struct SettingsView: View {
                     Button(action: {
                         let opened = NSWorkspace.shared.open(saveDirectory)
                         if !opened {
-                            print("Could not open directory: \(saveDirectory)")
+                            Logger.error("Could not open directory: \(saveDirectory)", category: .fileOperations)
                             let error = NSError(domain: "ScreenCap", code: 101, userInfo: [NSLocalizedDescriptionKey: "Could not open directory in Finder"])
                             SentrySDK.capture(error: error)
                         }
@@ -576,7 +577,7 @@ struct SettingsView: View {
                 screenshotManager.updateSaveDirectory(url)
             }
         case .failure(let error):
-            print("Error selecting directory: \(error)")
+            Logger.error("Error selecting directory", error: error, category: .fileOperations)
             SentrySDK.capture(error: error)
         }
     }
@@ -653,7 +654,7 @@ struct SafeKeyboardShortcutRecorder: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             // Verify that the shortcut can be initialized
             let _ = KeyboardShortcuts.getShortcut(for: name)
-            print("Successfully initialized shortcut: \(name)")
+            Logger.debug("Successfully initialized shortcut: \(name)", category: .shortcuts)
             isInitialized = true
             hasError = false
         }

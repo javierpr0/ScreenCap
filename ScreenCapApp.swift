@@ -4,6 +4,7 @@ import Foundation
 import KeyboardShortcuts
 import Sentry
 import UserNotifications
+import ScreenCapCore
 
 @main
 struct ScreenCapApp: App {
@@ -22,9 +23,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindow: NSWindow?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        SentrySDK.start { options in
-            options.dsn = "https://8c7615afda19917d5fe98ace3ad57c60@o394654.ingest.us.sentry.io/4509668386930688"
-            options.debug = true
+        // Initialize Sentry with configuration from environment or config file
+        if let sentryDSN = Configuration.sentryDSN {
+            SentrySDK.start { options in
+                options.dsn = sentryDSN
+                options.debug = Configuration.sentryDebugEnabled
+            }
+            Logger.info("Sentry initialized successfully", category: .general)
+        } else {
+            Logger.warning("Sentry DSN not configured, error tracking disabled", category: .general)
         }
         // Configure the app to not appear in the dock
         NSApp.setActivationPolicy(.accessory)

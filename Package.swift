@@ -27,11 +27,19 @@ let package = Package(
                 "SettingsView.swift",
                 "FloatingPreviewWindow.swift",
                 "ImageDragView.swift",
-                "KeyboardShortcutNames.swift"
+                "KeyboardShortcutNames.swift",
+                "Views/SettingsComponents.swift",
+                "Views/GeneralSettingsTab.swift",
+                "Views/ShortcutsSettingsTab.swift"
             ],
             resources: [
                 .process("ScreenCap.entitlements")
             ]
+        ),
+        .testTarget(
+            name: "ScreenCapTests",
+            dependencies: ["KeyboardShortcuts", .product(name: "Sentry", package: "sentry-cocoa")],
+            path: "Tests/ScreenCapTests"
         )
     ]
 )

@@ -6,77 +6,132 @@ import AVFoundation
 import Sentry
 import ScreenCaptureKit
 
+// MARK: - Custom Error Types
+
+enum ScreenCapError: LocalizedError {
+    case noDisplayFound
+    case permissionDenied
+    case captureKitError(String)
+    case fileWriteError(String)
+    case imageProcessingError
+    case invalidSaveDirectory(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .noDisplayFound: return "No display found"
+        case .permissionDenied: return "Screen recording permission denied"
+        case .captureKitError(let msg): return "ScreenCaptureKit error: \(msg)"
+        case .fileWriteError(let msg): return "Error saving: \(msg)"
+        case .imageProcessingError: return "Could not process the image"
+        case .invalidSaveDirectory(let msg): return "Invalid save directory: \(msg)"
+        }
+    }
+}
+
+// MARK: - Recent Capture Model
+
+struct RecentCapture: Identifiable, Codable {
+    let id: UUID
+    let filename: String
+    let filePath: String
+    let captureType: String
+    let timestamp: Date
+
+    init(filename: String, filePath: String, captureType: String) {
+        self.id = UUID()
+        self.filename = filename
+        self.filePath = filePath
+        self.captureType = captureType
+        self.timestamp = Date()
+    }
+}
+
+// MARK: - Screenshot Manager
+
 class ScreenshotManager: ObservableObject {
     private let userDefaults = UserDefaults.standard
-    
-    // Default configurations
+
+    static let maxRecentCaptures = 10
+
+    // MARK: - Published State
+
+    @Published var recentCaptures: [RecentCapture] = []
+    @Published var copyToClipboard: Bool = false
+
+    // MARK: - Configuration Properties
+
     private var filePrefix: String {
-        return userDefaults.string(forKey: "filePrefix") ?? "Screenshot"
+        let raw = userDefaults.string(forKey: "filePrefix") ?? "Screenshot"
+        return Self.sanitizeFilename(raw)
     }
-    
+
     private var saveDirectory: URL {
         if let savedPath = userDefaults.string(forKey: "saveDirectory"),
            let url = URL(string: savedPath) {
             return url
         }
-        // Use a safe default value
         if let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first {
             return desktopURL
         }
-        // Fallback to user's home directory
         return FileManager.default.homeDirectoryForCurrentUser
     }
-    
+
     private var includeTimestamp: Bool {
         return userDefaults.bool(forKey: "includeTimestamp")
     }
-    
+
     private var imageFormat: String {
         return userDefaults.string(forKey: "imageFormat") ?? "png"
     }
-    
+
     private var floatingPreviewTime: Double {
-        return userDefaults.double(forKey: "floatingPreviewTime") != 0 ? 
-               userDefaults.double(forKey: "floatingPreviewTime") : 10.0
+        let time = userDefaults.double(forKey: "floatingPreviewTime")
+        return time > 0 ? time : 10.0
     }
-    
+
+    // MARK: - Initialization
+
     init() {
-        // Configure default values if they don't exist
         setupDefaultSettings()
-        // Request notification permissions
         requestNotificationPermission()
+        loadRecentCaptures()
+        copyToClipboard = userDefaults.bool(forKey: "copyToClipboard")
     }
-    
-    // MARK: - Permission Checking
-    
-    private func checkScreenRecordingPermission() -> Bool {
-        // Since our target is macOS 14.0+, we can use ScreenCaptureKit directly
-        return checkScreenCaptureKitPermission()
+
+    // MARK: - Filename Sanitization
+
+    static func sanitizeFilename(_ input: String) -> String {
+        let forbidden = CharacterSet(charactersIn: "/\\:*?\"<>|.")
+        let sanitized = input.components(separatedBy: forbidden).joined(separator: "_")
+        let trimmed = sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Screenshot" : String(trimmed.prefix(100))
     }
-    
-    @available(macOS 14.0, *)
-    private func checkScreenCaptureKitPermission() -> Bool {
-        // Use ScreenCaptureKit to check if we can access screen content
-        let semaphore = DispatchSemaphore(value: 0)
-        var hasPermission = false
-        
-        Task {
-            do {
-                // Try to get shareable content - this requires screen recording permission
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                hasPermission = !content.displays.isEmpty
-            } catch {
-                hasPermission = false
-            }
-            semaphore.signal()
+
+    // MARK: - Directory Validation
+
+    func validateSaveDirectory(_ url: URL) -> Result<Void, ScreenCapError> {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            return .failure(.invalidSaveDirectory("Directory does not exist"))
         }
-        
-        // Wait for async operation with timeout
-        _ = semaphore.wait(timeout: .now() + 3.0)
-        return hasPermission
+        guard FileManager.default.isWritableFile(atPath: url.path) else {
+            return .failure(.invalidSaveDirectory("Directory is not writable"))
+        }
+        return .success(())
     }
-    
-    
+
+    // MARK: - Permission Checking (Async)
+
+    private func checkScreenRecordingPermissionAsync() async -> Bool {
+        do {
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            return !content.displays.isEmpty
+        } catch {
+            return false
+        }
+    }
+
     private func showPermissionAlert() {
         DispatchQueue.main.async {
             let alert = NSAlert()
@@ -85,10 +140,9 @@ class ScreenshotManager: ObservableObject {
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Open Settings")
             alert.addButton(withTitle: "Cancel")
-            
+
             let response = alert.runModal()
             if response == .alertFirstButtonReturn {
-                // Open System Settings
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
                     let opened = NSWorkspace.shared.open(url)
                     if !opened {
@@ -100,7 +154,7 @@ class ScreenshotManager: ObservableObject {
             }
         }
     }
-    
+
     private func setupDefaultSettings() {
         if userDefaults.object(forKey: "filePrefix") == nil {
             userDefaults.set("Screenshot", forKey: "filePrefix")
@@ -112,18 +166,16 @@ class ScreenshotManager: ObservableObject {
             userDefaults.set("png", forKey: "imageFormat")
         }
     }
-    
+
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error = error {
                 print("Error requesting notification permission: \(error)")
                 SentrySDK.capture(error: error)
-            } else {
-                print("Notification permission granted: \(granted)")
             }
         }
     }
-    
+
     private func checkNotificationPermission(completion: @escaping (Bool) -> Void) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {
@@ -131,201 +183,328 @@ class ScreenshotManager: ObservableObject {
             }
         }
     }
-    
-    // MARK: - Capture Methods
-    
+
+    // MARK: - Capture Methods (Now Async)
+
     func captureFullScreen() {
-        guard checkScreenRecordingPermission() else {
-            showPermissionAlert()
-            return
+        Task {
+            guard await checkScreenRecordingPermissionAsync() else {
+                await MainActor.run { showPermissionAlert() }
+                return
+            }
+            await performFullScreenCapture()
         }
-        
+    }
+
+    @MainActor
+    private func performFullScreenCapture() async {
         guard let screen = NSScreen.main else {
             showError("Could not access the main screen")
             return
         }
-        
         let rect = screen.frame
-        captureRect(rect, description: "full screen")
+        await captureRectWithScreenCaptureKit(rect, description: "full screen")
     }
-    
+
     func captureSelection() {
-        guard checkScreenRecordingPermission() else {
-            showPermissionAlert()
-            return
-        }
-        
-        // Use macOS native command for selection
-        let task = Process()
-        task.launchPath = "/usr/sbin/screencapture"
-        task.arguments = ["-i", "-s", "/tmp/screencap_temp.png"]
-        
-        task.terminationHandler = { _ in
-            DispatchQueue.main.async {
-                self.processTemporaryScreenshot(description: "selection")
-            }
-        }
-        
-        do {
-            try task.run()
-        } catch {
-            showError("Error starting selection capture: \(error.localizedDescription)")
-            SentrySDK.capture(error: error)
-        }
-    }
-    
-    func captureWindow() {
-        guard checkScreenRecordingPermission() else {
-            showPermissionAlert()
-            return
-        }
-        
-        // Use macOS native command for window
-        let task = Process()
-        task.launchPath = "/usr/sbin/screencapture"
-        task.arguments = ["-i", "-w", "/tmp/screencap_temp.png"]
-        
-        task.terminationHandler = { _ in
-            DispatchQueue.main.async {
-                self.processTemporaryScreenshot(description: "window")
-            }
-        }
-        
-        do {
-            try task.run()
-        } catch {
-            showError("Error starting window capture: \(error.localizedDescription)")
-            SentrySDK.capture(error: error)
-        }
-    }
-    
-    private func captureRect(_ rect: NSRect, description: String) {
-        // Since our target is macOS 14.0+, we can use ScreenCaptureKit directly
-        captureRectWithScreenCaptureKit(rect, description: description)
-    }
-    
-    @available(macOS 14.0, *)
-    private func captureRectWithScreenCaptureKit(_ rect: NSRect, description: String) {
         Task {
+            guard await checkScreenRecordingPermissionAsync() else {
+                await MainActor.run { showPermissionAlert() }
+                return
+            }
+            await performSelectionCapture()
+        }
+    }
+
+    private func performSelectionCapture() async {
+        let tempPath = "/tmp/screencap_\(UUID().uuidString).png"
+
+        let task = Process()
+        task.launchPath = "/usr/sbin/screencapture"
+        task.arguments = ["-i", "-s", tempPath]
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            await MainActor.run {
+                self.processTemporaryScreenshot(at: tempPath, description: "selection")
+            }
+        } catch {
+            await MainActor.run {
+                self.showError("Error starting selection capture: \(error.localizedDescription)")
+                SentrySDK.capture(error: error)
+            }
+        }
+    }
+
+    func captureWindow() {
+        Task {
+            guard await checkScreenRecordingPermissionAsync() else {
+                await MainActor.run { showPermissionAlert() }
+                return
+            }
+            await performWindowCapture()
+        }
+    }
+
+    private func performWindowCapture() async {
+        let tempPath = "/tmp/screencap_\(UUID().uuidString).png"
+
+        let task = Process()
+        task.launchPath = "/usr/sbin/screencapture"
+        task.arguments = ["-i", "-w", tempPath]
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            await MainActor.run {
+                self.processTemporaryScreenshot(at: tempPath, description: "window")
+            }
+        } catch {
+            await MainActor.run {
+                self.showError("Error starting window capture: \(error.localizedDescription)")
+                SentrySDK.capture(error: error)
+            }
+        }
+    }
+
+    // MARK: - Multi-Monitor Support
+
+    func captureDisplay(at index: Int) {
+        Task {
+            guard await checkScreenRecordingPermissionAsync() else {
+                await MainActor.run { showPermissionAlert() }
+                return
+            }
+
             do {
-                // Get available displays
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                
-                guard let display = content.displays.first else {
-                    await MainActor.run {
-                        self.showError("No display found")
-                    }
+                guard index < content.displays.count else {
+                    await MainActor.run { self.showError("Display not found") }
                     return
                 }
-                
-                // Create content filter for the display
+
+                let display = content.displays[index]
                 let filter = SCContentFilter(display: display, excludingWindows: [])
-                
-                // Configure screenshot parameters
+
                 let configuration = SCStreamConfiguration()
-                configuration.width = Int(rect.width)
-                configuration.height = Int(rect.height)
-                configuration.sourceRect = rect
+                configuration.width = display.width
+                configuration.height = display.height
                 configuration.showsCursor = true
                 configuration.scalesToFit = false
-                
-                // Capture the screenshot
+
                 let cgImage = try await SCScreenshotManager.captureImage(
                     contentFilter: filter,
                     configuration: configuration
                 )
-                
-                // Convert to NSImage and save on main thread
+
                 await MainActor.run {
-                    let nsImage = NSImage(cgImage: cgImage, size: rect.size)
-                    self.saveImage(nsImage, description: description)
+                    let size = NSSize(width: display.width, height: display.height)
+                    let nsImage = NSImage(cgImage: cgImage, size: size)
+                    self.saveImage(nsImage, description: "display \(index + 1)")
                 }
-                
             } catch {
                 await MainActor.run {
-                    self.showError("ScreenCaptureKit error: \(error.localizedDescription)")
+                    self.showError("Capture error: \(error.localizedDescription)")
                     SentrySDK.capture(error: error)
                 }
             }
         }
     }
-    
-    private func processTemporaryScreenshot(description: String) {
-        let tempPath = "/tmp/screencap_temp.png"
-        
+
+    func getAvailableDisplays() async -> [SCDisplay] {
+        do {
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            return content.displays
+        } catch {
+            return []
+        }
+    }
+
+    // MARK: - ScreenCaptureKit Capture
+
+    private func captureRectWithScreenCaptureKit(_ rect: NSRect, description: String) async {
+        do {
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+            guard let display = content.displays.first else {
+                await MainActor.run { self.showError("No display found") }
+                return
+            }
+
+            let filter = SCContentFilter(display: display, excludingWindows: [])
+
+            let configuration = SCStreamConfiguration()
+            configuration.width = Int(rect.width)
+            configuration.height = Int(rect.height)
+            configuration.sourceRect = rect
+            configuration.showsCursor = true
+            configuration.scalesToFit = false
+
+            let cgImage = try await SCScreenshotManager.captureImage(
+                contentFilter: filter,
+                configuration: configuration
+            )
+
+            await MainActor.run {
+                let nsImage = NSImage(cgImage: cgImage, size: rect.size)
+                self.saveImage(nsImage, description: description)
+            }
+
+        } catch {
+            await MainActor.run {
+                self.showError("ScreenCaptureKit error: \(error.localizedDescription)")
+                SentrySDK.capture(error: error)
+            }
+        }
+    }
+
+    // MARK: - Image Processing & Saving
+
+    private func processTemporaryScreenshot(at tempPath: String, description: String) {
+        defer {
+            // Always clean up temp file
+            try? FileManager.default.removeItem(atPath: tempPath)
+        }
+
         guard FileManager.default.fileExists(atPath: tempPath),
               let nsImage = NSImage(contentsOfFile: tempPath) else {
             // User cancelled the capture
             return
         }
-        
+
         saveImage(nsImage, description: description)
-        
-        // Clean up temporary file
-        do {
-            try FileManager.default.removeItem(atPath: tempPath)
-        } catch {
-            // It's not critical if temporary file cleanup fails
-            print("Could not delete temporary file: \(error)")
-        }
     }
-    
+
     private func saveImage(_ image: NSImage, description: String) {
+        // Validate save directory
+        if case .failure(let error) = validateSaveDirectory(saveDirectory) {
+            showError(error.localizedDescription)
+            return
+        }
+
         let filename = generateFilename()
         let fileURL = saveDirectory.appendingPathComponent(filename)
-        
+
         guard let imageData = getImageData(from: image) else {
             showError("Could not process the image")
             return
         }
-        
-        do {
-            try imageData.write(to: fileURL)
-            showSuccess("\(description) capture saved: \(filename)")
-            
-            // Show floating window with captured image
-            DispatchQueue.main.async {
-                self.showFloatingPreview(image: image)
+
+        // Write file on background queue to avoid blocking UI
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            do {
+                try imageData.write(to: fileURL)
+
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+
+                    // Copy to clipboard if enabled
+                    if self.copyToClipboard {
+                        self.copyImageToClipboard(image)
+                    }
+
+                    // Track recent capture
+                    self.addRecentCapture(filename: filename, filePath: fileURL.path, captureType: description)
+
+                    self.showSuccess("\(description) capture saved: \(filename)")
+                    self.showFloatingPreview(image: image)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self?.showError("Error saving: \(error.localizedDescription)")
+                    SentrySDK.capture(error: error)
+                }
             }
-        } catch {
-            showError("Error saving: \(error.localizedDescription)")
-            SentrySDK.capture(error: error)
         }
     }
-    
+
     private func showFloatingPreview(image: NSImage) {
         let previewWindow = FloatingPreviewWindow(image: image, autoCloseTime: floatingPreviewTime)
         previewWindow.makeKeyAndOrderFront(nil)
     }
-    
-    private func generateFilename() -> String {
+
+    // MARK: - Clipboard Support
+
+    private func copyImageToClipboard(_ image: NSImage) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([image])
+    }
+
+    func updateCopyToClipboard(_ enabled: Bool) {
+        copyToClipboard = enabled
+        userDefaults.set(enabled, forKey: "copyToClipboard")
+    }
+
+    // MARK: - Recent Captures
+
+    private func loadRecentCaptures() {
+        guard let data = userDefaults.data(forKey: "recentCaptures"),
+              let captures = try? JSONDecoder().decode([RecentCapture].self, from: data) else {
+            return
+        }
+        recentCaptures = captures
+    }
+
+    private func saveRecentCaptures() {
+        guard let data = try? JSONEncoder().encode(recentCaptures) else { return }
+        userDefaults.set(data, forKey: "recentCaptures")
+    }
+
+    private func addRecentCapture(filename: String, filePath: String, captureType: String) {
+        let capture = RecentCapture(filename: filename, filePath: filePath, captureType: captureType)
+        recentCaptures.insert(capture, at: 0)
+        if recentCaptures.count > Self.maxRecentCaptures {
+            recentCaptures = Array(recentCaptures.prefix(Self.maxRecentCaptures))
+        }
+        saveRecentCaptures()
+    }
+
+    func clearRecentCaptures() {
+        recentCaptures.removeAll()
+        saveRecentCaptures()
+    }
+
+    func openRecentCapture(_ capture: RecentCapture) {
+        let url = URL(fileURLWithPath: capture.filePath)
+        NSWorkspace.shared.open(url)
+    }
+
+    func revealRecentCapture(_ capture: RecentCapture) {
+        let url = URL(fileURLWithPath: capture.filePath)
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    // MARK: - Filename Generation
+
+    func generateFilename() -> String {
         var filename = filePrefix
-        
+
         if includeTimestamp {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
             filename += "_\(formatter.string(from: Date()))"
         } else {
-            // If timestamp not included, add sequential number
             var counter = 1
             var testFilename: String
             repeat {
                 testFilename = "\(filename)_\(counter).\(imageFormat)"
                 counter += 1
             } while FileManager.default.fileExists(atPath: saveDirectory.appendingPathComponent(testFilename).path)
-            
+
             return testFilename
         }
-        
+
         return "\(filename).\(imageFormat)"
     }
-    
+
     private func getImageData(from image: NSImage) -> Data? {
         guard let tiffData = image.tiffRepresentation,
               let bitmapRep = NSBitmapImageRep(data: tiffData) else {
             return nil
         }
-        
+
         switch imageFormat.lowercased() {
         case "png":
             return bitmapRep.representation(using: .png, properties: [:])
@@ -335,9 +514,9 @@ class ScreenshotManager: ObservableObject {
             return bitmapRep.representation(using: .png, properties: [:])
         }
     }
-    
+
     // MARK: - Notifications
-    
+
     private func showSuccess(_ message: String) {
         checkNotificationPermission { hasPermission in
             if hasPermission {
@@ -345,7 +524,7 @@ class ScreenshotManager: ObservableObject {
                 content.title = "ScreenCap"
                 content.body = message
                 content.sound = .default
-                
+
                 let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
                 UNUserNotificationCenter.current().add(request) { error in
                     if let error = error {
@@ -358,7 +537,7 @@ class ScreenshotManager: ObservableObject {
             }
         }
     }
-    
+
     private func showError(_ message: String) {
         checkNotificationPermission { hasPermission in
             if hasPermission {
@@ -366,7 +545,7 @@ class ScreenshotManager: ObservableObject {
                 content.title = "ScreenCap - Error"
                 content.body = message
                 content.sound = .default
-                
+
                 let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
                 UNUserNotificationCenter.current().add(request) { error in
                     if let error = error {
@@ -379,48 +558,38 @@ class ScreenshotManager: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Settings Management
-    
+
     func updatePrefix(_ newPrefix: String) {
         userDefaults.set(newPrefix, forKey: "filePrefix")
     }
-    
+
     func updateSaveDirectory(_ newDirectory: URL) {
+        if case .failure(let error) = validateSaveDirectory(newDirectory) {
+            showError(error.localizedDescription)
+            return
+        }
         userDefaults.set(newDirectory.absoluteString, forKey: "saveDirectory")
     }
-    
+
     func updateIncludeTimestamp(_ include: Bool) {
         userDefaults.set(include, forKey: "includeTimestamp")
     }
-    
+
     func updateImageFormat(_ format: String) {
         userDefaults.set(format, forKey: "imageFormat")
     }
-    
+
     func updateFloatingPreviewTime(_ time: Double) {
         userDefaults.set(time, forKey: "floatingPreviewTime")
     }
-    
+
     // MARK: - Getters for Settings
-    
-    func getCurrentPrefix() -> String {
-        return filePrefix
-    }
-    
-    func getCurrentSaveDirectory() -> URL {
-        return saveDirectory
-    }
-    
-    func getCurrentIncludeTimestamp() -> Bool {
-        return includeTimestamp
-    }
-    
-    func getCurrentImageFormat() -> String {
-        return imageFormat
-    }
-    
-    func getCurrentFloatingPreviewTime() -> Double {
-        return floatingPreviewTime
-    }
+
+    func getCurrentPrefix() -> String { return filePrefix }
+    func getCurrentSaveDirectory() -> URL { return saveDirectory }
+    func getCurrentIncludeTimestamp() -> Bool { return includeTimestamp }
+    func getCurrentImageFormat() -> String { return imageFormat }
+    func getCurrentFloatingPreviewTime() -> Double { return floatingPreviewTime }
 }
